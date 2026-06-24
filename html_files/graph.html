@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graph</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #fafafa; padding: 8px; margin: 0; }
+    h3 { font-size: 13px; color: #16213e; margin: 0 0 8px 0; }
+    #svg-area svg { display: block; max-width: 100%; }
+    .info { margin-top: 10px; font-size: 12px; }
+    .info table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .info th { background: #4ECDC4; color: white; padding: 4px 8px; }
+    .info td { padding: 4px 8px; border: 1px solid #ddd; }
+    .no-data { text-align: center; color: #888; padding: 40px; font-style: italic; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h3>&#9650; Computation Graph</h3>
+  <div id="svg-area"><p class="no-data">No graph loaded — upload a config to get started.</p></div>
+  <div class="info" id="info-area"></div>
+
+  <script>
+    function refresh() {
+      fetch('/api/update')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          document.getElementById('svg-area').innerHTML = d.svg;
+          document.getElementById('info-area').innerHTML = d.topicsHtml;
+        })
+        .catch(function() {});
+    }
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

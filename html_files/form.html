@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Control</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 10px; font-size: 13px;
+           margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    h3 { color: #16213e; margin-bottom: 8px; font-size: 13px; border-bottom: 2px solid #4ECDC4;
+         padding-bottom: 3px; }
+    label { display: block; margin-bottom: 3px; color: #333; font-weight: bold; }
+    input[type=text], textarea {
+      width: 100%; padding: 5px 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    textarea { resize: vertical; font-family: monospace; }
+    button { margin-top: 6px; padding: 6px 12px; background: #4ECDC4; color: white;
+             border: none; border-radius: 4px; cursor: pointer; font-size: 13px; width: 100%; }
+    button:hover { background: #3ab9b0; }
+    .section { background: white; border-radius: 6px; padding: 10px; margin-bottom: 10px;
+               box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-shrink: 0; }
+    .hint { font-size: 11px; color: #888; margin-top: 3px; }
+    .status { margin-top: 6px; font-size: 12px; min-height: 16px; }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 2px solid #4ECDC4; margin-bottom: 8px; }
+    .tab  { padding: 5px 10px; cursor: pointer; font-size: 12px; border-radius: 4px 4px 0 0;
+            color: #555; border: 1px solid transparent; border-bottom: none; }
+    .tab.active { background: #4ECDC4; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Log panel */
+    #log-section { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #log-list    { flex: 1; overflow-y: auto; background: #111; color: #0f0; font-family: monospace;
+                   font-size: 11px; padding: 6px; border-radius: 4px; min-height: 60px; }
+    #log-list .entry { padding: 1px 0; border-bottom: 1px solid #222; }
+    #log-list .empty { color: #555; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Section 1: Config / Expression tabs ── -->
+  <div class="section" style="flex-shrink:0">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('conf')">&#128196; Load Config</div>
+      <div class="tab"        onclick="showTab('expr')">&#10000; Expressions</div>
+    </div>
+
+    <!-- Tab: Load Config -->
+    <div id="tab-conf" class="tab-content active">
+      <form id="upload-form">
+        <label>Config file (.conf)</label>
+        <input type="file" id="conf-file" accept=".conf,.txt" style="width:100%;margin-bottom:5px">
+        <button type="submit">Upload &amp; Build Graph</button>
+      </form>
+      <div class="status" id="upload-status"></div>
+    </div>
+
+    <!-- Tab: Expression Builder -->
+    <div id="tab-expr" class="tab-content">
+      <label>Math expressions</label>
+      <textarea id="expr-text" rows="5"
+        placeholder="C = A + B&#10;D = inc(C)&#10;E = max(A, C)&#10;F = avg(D, E)&#10;G = A * B"></textarea>
+      <p class="hint">
+        Supported: A + B &nbsp;·&nbsp; A * B &nbsp;·&nbsp; avg(A,B) &nbsp;·&nbsp;
+        max(A,B) &nbsp;·&nbsp; min(A,B) &nbsp;·&nbsp; inc(A) &nbsp;·&nbsp; A + 1
+      </p>
+      <button onclick="buildFromExpressions()">&#9654; Build Graph</button>
+      <div class="status" id="expr-status"></div>
+    </div>
+  </div>
+
+  <!-- ── Section 2: Publish Message ── -->
+  <div class="section" style="flex-shrink:0">
+    <h3>&#128257; Publish Message</h3>
+    <form id="publish-form">
+      <label>Topic name(s)</label>
+      <input type="text" id="pub-topic" placeholder="e.g. A  or  X,Y,Z">
+      <label style="margin-top:6px">Value(s)</label>
+      <input type="text" id="pub-value" placeholder="e.g. 5  or  1,2,3">
+      <p class="hint">Multiple: topic=X,Y,Z and value=1,2,3 publishes X=1, Y=2, Z=3</p>
+      <button type="submit">Publish</button>
+    </form>
+    <div class="status" id="publish-status"></div>
+  </div>
+
+  <!-- ── Section 3: Log panel ── -->
+  <div id="log-section" class="section">
+    <h3>&#128221; Event Log</h3>
+    <div id="log-list"><span class="empty">No events yet.</span></div>
+  </div>
+
+  <script>
+    // ── Tab switching ──────────────────────────────────────────────────────────
+    function showTab(name) {
+      document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.tab').forEach(function(el)         { el.classList.remove('active'); });
+      document.getElementById('tab-' + name).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    // ── Upload config ──────────────────────────────────────────────────────────
+    document.getElementById('upload-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var file   = document.getElementById('conf-file').files[0];
+      var status = document.getElementById('upload-status');
+
+      function doUpload(content) {
+        status.innerHTML = '<span style="color:#888">Uploading…</span>';
+        fetch('/upload', { method: 'POST', body: content })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.ok) {
+              status.innerHTML = '<span style="color:green">&#10003; Config loaded successfully.</span>';
+            } else {
+              status.innerHTML = '<span style="color:red">&#10007; '
+                + (d.error || 'Unknown error').replace(/\n/g, '<br>') + '</span>';
+            }
+          })
+          .catch(function(err) { status.innerHTML = '<span style="color:red">&#10007; ' + err + '</span>'; });
+      }
+
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function(ev) { doUpload(ev.target.result); };
+        reader.readAsText(file);
+      } else {
+        status.innerHTML = '<span style="color:red">Please choose a .conf file first.</span>';
+      }
+    });
+
+    // ── Expression builder ─────────────────────────────────────────────────────
+    function buildFromExpressions() {
+      var text   = document.getElementById('expr-text').value.trim();
+      var status = document.getElementById('expr-status');
+      if (!text) { status.innerHTML = '<span style="color:red">Please enter at least one expression.</span>'; return; }
+
+      status.innerHTML = '<span style="color:#888">Building…</span>';
+      fetch('/expression', { method: 'POST', body: text })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.ok) {
+            status.innerHTML = '<span style="color:green">&#10003; Graph built from expressions.</span>';
+          } else {
+            status.innerHTML = '<span style="color:red">&#10007; ' + (d.error || 'Parse error') + '</span>';
+          }
+        })
+        .catch(function(err) { status.innerHTML = '<span style="color:red">&#10007; ' + err + '</span>'; });
+    }
+
+    // ── Publish message ────────────────────────────────────────────────────────
+    document.getElementById('publish-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      var topics = document.getElementById('pub-topic').value.trim();
+      var values = document.getElementById('pub-value').value.trim();
+      var status = document.getElementById('publish-status');
+
+      if (!topics || !values) {
+        status.innerHTML = '<span style="color:red">Both fields are required.</span>';
+        return;
+      }
+
+      // Support multi-value: split and publish each pair sequentially
+      var topicArr = topics.split(',').map(function(s) { return s.trim(); });
+      var valueArr = values.split(',').map(function(s) { return s.trim(); });
+
+      if (topicArr.length !== valueArr.length) {
+        status.innerHTML = '<span style="color:red">Number of topics and values must match ('
+          + topicArr.length + ' topics, ' + valueArr.length + ' values).</span>';
+        return;
+      }
+
+      status.innerHTML = '<span style="color:#888">Publishing…</span>';
+
+      // Send all pairs to the server as a single request using comma syntax
+      var encodedTopics = topicArr.map(encodeURIComponent).join(',');
+      var encodedValues = valueArr.map(encodeURIComponent).join(',');
+      fetch('/publish?topic=' + encodedTopics + '&message=' + encodedValues)
+        .then(function(r) { return r.text(); })
+        .then(function(body) {
+          var lines = body.trim().split('\n');
+          var errors = lines.filter(function(l) { return l.indexOf('ERROR') >= 0; });
+          var oks    = lines.filter(function(l) { return l.indexOf('OK')    >= 0; });
+          var html = '';
+          if (errors.length) {
+            html += '<span style="color:red">&#10007; ' + errors.join('<br>') + '</span>';
+          }
+          if (oks.length) {
+            html += (html ? '<br>' : '') + '<span style="color:green">&#10003; '
+                  + oks.map(function(l) { return l.replace('OK: ',''); }).join(', ') + '</span>';
+          }
+          status.innerHTML = html || '<span style="color:green">&#10003; Done</span>';
+          setTimeout(function() { status.textContent = ''; }, 4000);
+        })
+        .catch(function(err) {
+          status.innerHTML = '<span style="color:red">&#10007; ' + err + '</span>';
+        });
+    });
+
+    // ── Log polling ────────────────────────────────────────────────────────────
+    function refreshLog() {
+      fetch('/api/update')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var list = document.getElementById('log-list');
+          if (!d.log || d.log.length === 0) {
+            list.innerHTML = '<span class="empty">No events yet.</span>';
+          } else {
+            list.innerHTML = d.log.map(function(e) {
+              return '<div class="entry">' + e + '</div>';
+            }).join('');
+          }
+        })
+        .catch(function() {});
+    }
+    refreshLog();
+    setInterval(refreshLog, 2000);
+  </script>
+</body>
+</html>

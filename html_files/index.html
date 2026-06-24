@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Idan &amp; Ido Graph Computation Web</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; height: 100vh; display: flex; flex-direction: column; }
+    header { background: #16213e; padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #4ECDC4; }
+    header h1 { font-size: 1.3rem; color: #4ECDC4; }
+    .panels { display: flex; flex: 1; overflow: hidden; }
+    .panel { display: flex; flex-direction: column; border-right: 1px solid #333; }
+    .panel-title { background: #16213e; padding: 8px 12px; font-size: 0.8rem; color: #4ECDC4; text-transform: uppercase; letter-spacing: 1px; }
+    iframe { flex: 1; border: none; background: #fff; }
+    #panel-control { width: 300px; min-width: 260px; }
+    #panel-graph   { flex: 1; }
+    #panel-topics  { width: 320px; min-width: 260px; border-right: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>&#9650; Idan &amp; Ido Graph Computation Web</h1>
+  </header>
+  <div class="panels">
+    <div class="panel" id="panel-control">
+      <div class="panel-title">Control</div>
+      <iframe src="/app/form.html" title="Control panel"></iframe>
+    </div>
+    <div class="panel" id="panel-graph">
+      <div class="panel-title">Graph</div>
+      <iframe src="/app/graph.html" title="Computation graph"></iframe>
+    </div>
+    <div class="panel" id="panel-topics">
+      <div class="panel-title">Topics &amp; Values</div>
+      <iframe src="/app/topics.html" title="Topic values"></iframe>
+    </div>
+  </div>
+</body>
+</html>
